@@ -5,19 +5,16 @@ Main Streamlit Application with OpenAI Integration
 
 import streamlit as st
 import pandas as pd
-import numpy as np
-from datetime import datetime
 import json
 import plotly.express as px
 import plotly.graph_objects as go
-from supabase import create_client, Client
+from supabase import create_client
 import openai
 from openai import OpenAI
 from typing import Dict, List, Tuple
 import os
 from dotenv import load_dotenv
-import supabase
-from utils.relationship_map import create_relationship_graph_v2
+from utils.relationship_map import create_hierarchical_mindmap
 # Load environment variables
 load_dotenv()
 
@@ -286,7 +283,7 @@ def dashboard_main():
     if 'All' not in selected_district:
         filtered_cities = filtered_cities[filtered_cities['water_districts'].isin(selected_district)]
     if 'All' not in selected_apl:
-        filtered_cities = filtered_cities[filtered_cities['apl_status'].isin(selected_apl)]
+        filtered_cities = filtered_cities[filtered_cities['apl_alignment'].isin(selected_apl)]
     filtered_cities = filtered_cities[filtered_cities['budget'] >= min_budget * 1_000_000]
     
     # Tabs
@@ -371,8 +368,7 @@ def dashboard_main():
     with tab2:
         st.subheader("🗺️ Infrastructure Relationship Map")
         
-        relationship_fig = create_relationship_graph_v2(display_df, districts_df, counties_df)
-        st.plotly_chart(relationship_fig, use_container_width=True)
+        relationship_fig = create_hierarchical_mindmap(display_df, districts_df, counties_df)
         
         
     with tab3:
@@ -437,6 +433,3 @@ def dashboard_main():
             )
             st.plotly_chart(scatter_fig, use_container_width=True)
         
-
-# if __name__ == "__main__":
-#     main()
