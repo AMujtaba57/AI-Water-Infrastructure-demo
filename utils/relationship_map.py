@@ -1,182 +1,135 @@
-import plotly.graph_objects as go
+import streamlit as st
+import networkx as nx
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+import numpy as np
 
+st.set_page_config(page_title="North Texas Mindmap", layout="wide")
 
-def create_relationship_graph_v2(cities_df, districts_df, counties_df):
-    """Create interactive relationship visualization similar to the attached image"""
-    
-    # Create a mapping of entities to coordinates
-    # We'll organize in a hierarchical structure: Counties -> Water Districts -> Cities
-    
-    # Define layout parameters
-    county_y = 10
-    district_y = 7
-    city_y = 4
-    
-    # Create figure
-    fig = go.Figure()
-    
-    # Color mapping for counties
-    county_colors = {row['name']: row['color_code'] for _, row in counties_df.iterrows()}
-    
-    # Add counties
-    county_x_positions = {}
-    for idx, county in enumerate(counties_df['name']):
-        x_pos = idx * 5
-        county_x_positions[county] = x_pos
-        
-        fig.add_trace(go.Scatter(
-            x=[x_pos],
-            y=[county_y],
-            mode='markers+text',
-            marker=dict(size=25, color=county_colors.get(county, 'gray')),
-            text=county,
-            textposition='top center',
-            name=county,
-            hovertemplate=f"<b>{county}</b><extra></extra>"
-        ))
-    
-    # Add water districts with connections to counties
-    district_x_positions = {}
-    district_county_map = {}
-    
-    # Create a mapping of districts to counties based on cities served
-    for _, city in cities_df.iterrows():
-        if city['Name District'] and city['County']:
-            district_county_map[city['Name District']] = city['County']
-    
-    # Position districts under their respective counties
-    district_count = {}
-    for idx, district in districts_df.iterrows():
-        district_name = district['name']
-        county_name = district_county_map.get(district_name)
-        
-        if county_name and county_name in county_x_positions:
-            county_x = county_x_positions[county_name]
-            
-            # Count how many districts are already under this county
-            if county_name not in district_count:
-                district_count[county_name] = 0
-            else:
-                district_count[county_name] += 1
-                
-            x_pos = county_x - 2 + (district_count[county_name] * 1.5)
-            district_x_positions[district_name] = x_pos
-            
-            # Add connection line from county to district
-            fig.add_trace(go.Scatter(
-                x=[county_x, x_pos],
-                y=[county_y - 0.5, district_y + 0.5],
-                mode='lines',
-                line=dict(color='gray', width=2),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-            
-            # Add district node
-            fig.add_trace(go.Scatter(
-                x=[x_pos],
-                y=[district_y],
-                mode='markers+text',
-                marker=dict(size=20, color='purple', symbol='square'),
-                text=district_name,
-                textposition='top center',
-                name=district_name,
-                hovertemplate=f"<b>{district_name}</b><br>" +
-                             f"Budget: ${district.get('budget', 0)/1_000_000:.1f}M<br>" +
-                             f"Cities Served: {district.get('cities_served', 0)}<extra></extra>"
-            ))
-    
-    # Add cities with connections to districts
-    city_count = {}
-    for idx, city in cities_df.iterrows():
-        city_name = city['City Name']
-        district_name = city['Name District']
-        county_name = city['County']
-        
-        if district_name and district_name in district_x_positions:
-            district_x = district_x_positions[district_name]
-            
-            # Count how many cities are already under this district
-            if district_name not in city_count:
-                city_count[district_name] = 0
-            else:
-                city_count[district_name] += 1
-                
-            x_pos = district_x - 1 + (city_count[district_name] * 0.7)
-            
-            # Add connection line from district to city
-            fig.add_trace(go.Scatter(
-                x=[district_x, x_pos],
-                y=[district_y - 0.5, city_y + 0.5],
-                mode='lines',
-                line=dict(color='lightgray', width=1),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-            
-            # Determine city color based on APL status
-            city_color = 'gray'
-            if city['Apl Alignment'] == 'STRONG':
-                city_color = 'green'
-            elif city['Apl Alignment'] == 'MODERATE':
-                city_color = 'orange'
-            elif city['Apl Alignment'] == 'UNKNOWN':
-                city_color = 'blue'
-            
-            # Add city node
-            fig.add_trace(go.Scatter(
-                x=[x_pos],
-                y=[city_y],
-                mode='markers+text',
-                marker=dict(size=15, color=city_color),
-                text=city_name,
-                textposition='bottom center',
-                name=city_name,
-                hovertemplate=f"<b>{city_name}</b><br>" +
-                             f"County: {county_name}<br>" +
-                             f"District: {district_name}<br>" +
-                             f"APL: {city['Apl Alignment']}<extra></extra>"
-            ))
-    
-    # Add legend for APL status
-    fig.add_trace(go.Scatter(
-        x=[-5], y=[-2],
-        mode='markers',
-        marker=dict(size=10, color='green'),
-        name='APL Strong',
-        showlegend=True
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=[-5], y=[-2],
-        mode='markers',
-        marker=dict(size=10, color='blue'),
-        name='APL Moderate',
-        showlegend=True
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=[-5], y=[-2],
-        mode='markers',
-        marker=dict(size=10, color='orange'),
-        name='APL Unknown',
-        showlegend=True
-    ))
-    
-    
-    fig.update_layout(
-        title="North Texas Water Infrastructure Relationships",
-        height=600,
-        showlegend=True,
-        legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="left",
-            x=0.01
-        ),
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-7, 25]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[0, 12]),
-        hovermode='closest'
+st.title("North Texas Regional Relationships - Hierarchical Mind Map")
+st.markdown("This interactive visualization shows counties, cities, water districts, and internal support structures.")
+
+def create_hierarchical_mindmap(display_df, districts_df, counties_df):
+    DATA = {"root": "North Texas Regional Relationships"}
+
+    # Counties
+    DATA["counties"] = counties_df["name"].unique().tolist()
+
+    # APL Alignment
+    DATA["apl_alignment"] = display_df["Apl Alignment"].dropna().unique().tolist()
+
+    # Water Districts
+    DATA["water_districts"] = districts_df["name"].unique().tolist()
+
+    # Cities grouped by County
+    DATA["cities"] = display_df.groupby("County")["City Name"].apply(list).to_dict()
+
+    # Internal Support (group cities by support type)
+    DATA["internal_support"] = (
+        display_df.groupby("Internal Support")["Service Type"].unique().apply(list).to_dict()
     )
-    
-    return fig
+
+    # Relationships
+    DATA["relationships"] = {}
+
+    # city_to_water mapping
+    DATA["relationships"]["city_to_water"] = [
+        {"city": row["City Name"], "district": row["Name District"], "type": row["Service Type"]}
+        for _, row in display_df.iterrows()
+    ]
+
+    G = nx.DiGraph()
+    positions = {}
+    node_colors = {}
+    node_sizes = {}
+    node_labels = {}
+
+    root = DATA["root"]
+    G.add_node(root)
+    positions[root] = (0, 0)
+    node_colors[root] = "#3498db"
+    node_sizes[root] = 3000
+    node_labels[root] = root
+
+    categories = [
+        ("counties", "#e74c3c", -1, 0),
+        ("apl_alignment", "#2ecc71", 0, -1),
+        ("water_districts", "#9b59b6", 1, 0),
+        ("internal_support", "#1abc9c", 0, 1)
+    ]
+
+    for i, (category, color, _, _) in enumerate(categories):
+        if category == "internal_support":
+            for j, (dept, teams) in enumerate(DATA[category].items()):
+                dept_id = f"{dept}"
+                G.add_node(dept_id)
+                G.add_edge(root, dept_id)
+                angle = np.pi/2 + j * np.pi/4
+                radius = 5
+                positions[dept_id] = (radius * np.cos(angle), radius * np.sin(angle))
+                node_colors[dept_id] = color
+                node_sizes[dept_id] = 1500
+                node_labels[dept_id] = dept
+
+                for k, team in enumerate(teams):
+                    team_id = f"{dept}_{team}"
+                    G.add_node(team_id)
+                    G.add_edge(dept_id, team_id)
+                    team_angle = angle + (k - len(teams)/2) * 0.2
+                    team_radius = radius + 3
+                    positions[team_id] = (team_radius * np.cos(team_angle), team_radius * np.sin(team_angle))
+                    node_colors[team_id] = "#16a085"
+                    node_sizes[team_id] = 1000
+                    node_labels[team_id] = team
+        else:
+            items = DATA[category]
+            for j, item in enumerate(items):
+                item_id = f"{category}_{item}"
+                G.add_node(item_id)
+                G.add_edge(root, item_id)
+
+                if category == "counties":
+                    angle = np.pi + j * np.pi/3
+                elif category == "apl_alignment":
+                    angle = 3*np.pi/2 + j * np.pi/4
+                elif category == "water_districts":
+                    angle = j * np.pi/3
+
+                radius = 5
+                positions[item_id] = (radius * np.cos(angle), radius * np.sin(angle))
+                node_colors[item_id] = color
+                node_sizes[item_id] = 1500
+                node_labels[item_id] = item
+
+                if category == "counties":
+                    try:
+                        cities = DATA["cities"][item]
+                        for k, city in enumerate(cities):
+                            city_id = f"{item}_{city}"
+                            G.add_node(city_id)
+                            G.add_edge(item_id, city_id)
+                            city_angle = angle + (k - len(cities)/2) * 0.2
+                            city_radius = radius + 3
+                            positions[city_id] = (city_radius * np.cos(city_angle), city_radius * np.sin(city_angle))
+                            node_colors[city_id] = "#f39c12"
+                            node_sizes[city_id] = 1000
+                            node_labels[city_id] = city
+                    except Exception as e:
+                        print('Error: ', e)
+
+    # Draw figure
+    fig, ax = plt.subplots(figsize=(16, 12))
+    nx.draw_networkx_nodes(G, positions, node_size=[node_sizes[node] for node in G.nodes()],
+                          node_color=[node_colors[node] for node in G.nodes()],
+                          alpha=0.9, edgecolors='white', linewidths=2, ax=ax)
+
+    nx.draw_networkx_edges(G, positions, edgelist=list(G.edges()), alpha=0.5, edge_color='gray', ax=ax)
+
+    for node, (x, y) in positions.items():
+        ax.annotate(node_labels[node], xy=(x, y), xytext=(0, 0), textcoords="offset points",
+                    bbox=dict(boxstyle="round,pad=0.3", fc=node_colors[node], ec="white", alpha=0.9),
+                    fontsize=9, color='white', weight='bold', ha='center', va='center')
+
+    ax.axis('off')
+    st.pyplot(fig)
